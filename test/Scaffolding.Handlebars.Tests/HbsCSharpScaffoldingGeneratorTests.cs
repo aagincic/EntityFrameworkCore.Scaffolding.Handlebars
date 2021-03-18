@@ -452,7 +452,8 @@ namespace Scaffolding.Handlebars.Tests
                 .AddSingleton<IEntityTypeTemplateService, FakeHbsEntityTypeTemplateService>()
                 .AddSingleton<ITemplateFileService>(fileService)
                 .AddSingleton<ITemplateLanguageService, FakeCSharpTemplateLanguageService>()
-                .AddSingleton<IModelCodeGenerator, HbsCSharpModelGenerator>();
+                .AddSingleton<IModelCodeGenerator, HbsCSharpModelGenerator>()
+                .AddSingleton<ResolvingNamesService, ResolvingNamesService>();
 
 #pragma warning disable EF1001 // Internal EF Core API usage.
             services
@@ -464,6 +465,7 @@ namespace Scaffolding.Handlebars.Tests
                         provider.GetRequiredService<IDbContextTemplateService>(),
                         provider.GetRequiredService<IEntityTypeTransformationService>(),
                         provider.GetRequiredService<ICSharpHelper>(),
+                        provider.GetRequiredService<ResolvingNamesService>(),
                         provider.GetRequiredService<IOptions<HandlebarsScaffoldingOptions>>());
                     return revEngOptions == ReverseEngineerOptions.DbContextOnly ||
                            revEngOptions == ReverseEngineerOptions.DbContextAndEntities
@@ -477,6 +479,7 @@ namespace Scaffolding.Handlebars.Tests
                         provider.GetRequiredService<ICSharpHelper>(),
                         provider.GetRequiredService<IEntityTypeTemplateService>(),
                         provider.GetRequiredService<IEntityTypeTransformationService>(),
+                        provider.GetRequiredService<ResolvingNamesService>(),
                         provider.GetRequiredService<IOptions<HandlebarsScaffoldingOptions>>());
                     return revEngOptions == ReverseEngineerOptions.EntitiesOnly ||
                            revEngOptions == ReverseEngineerOptions.DbContextAndEntities

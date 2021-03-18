@@ -59,6 +59,11 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
         protected IEntityTypeTransformationService EntityTypeTransformationService { get; }
 
         /// <summary>
+        /// Resolving names service
+        /// </summary>
+        protected ResolvingNamesService ResolvingNamesService { get; }
+
+        /// <summary>
         /// Handlebars template data.
         /// </summary>
         protected Dictionary<string, object> TemplateData { get; set; }
@@ -71,15 +76,17 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
         /// <param name="providerConfigurationCodeGenerator">Generator for scaffolding provider.</param>
         /// <param name="annotationCodeGenerator">Annotation code generator.</param>
         /// <param name="cSharpHelper">CSharp helper.</param>
+        /// <param name="resolvingNamesService">resolvingNamesService.</param>
         /// <param name="dbContextTemplateService">Template service for DbContext generator.</param>
         /// <param name="entityTypeTransformationService">Service for transforming entity definitions.</param>
         /// <param name="options">Handlebars scaffolding options.</param>
         public HbsCSharpDbContextGenerator(
-            [NotNull] IProviderConfigurationCodeGenerator providerConfigurationCodeGenerator, 
+            [NotNull] IProviderConfigurationCodeGenerator providerConfigurationCodeGenerator,
             [NotNull] IAnnotationCodeGenerator annotationCodeGenerator,
             [NotNull] IDbContextTemplateService dbContextTemplateService,
             [NotNull] IEntityTypeTransformationService entityTypeTransformationService,
             [NotNull] ICSharpHelper cSharpHelper,
+            [NotNull] ResolvingNamesService resolvingNamesService,
             [NotNull] IOptions<HandlebarsScaffoldingOptions> options)
             : base(providerConfigurationCodeGenerator, annotationCodeGenerator, cSharpHelper)
         {
@@ -88,6 +95,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             CSharpHelper = cSharpHelper;
             DbContextTemplateService = dbContextTemplateService;
             EntityTypeTransformationService = entityTypeTransformationService;
+            ResolvingNamesService = resolvingNamesService;
             _options = options;
         }
 
@@ -403,7 +411,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
 
             foreach (var foreignKey in entityType.GetScaffoldForeignKeys(_options.Value))
             {
-                GenerateRelationship(foreignKey, useDataAnnotations, sb);
+                GenerateRelationship(entityType, foreignKey, useDataAnnotations, sb);
             }
         }
 
@@ -684,38 +692,45 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             AppendMultiLineFluentApi(property.DeclaringEntityType, lines, sb);
         }
 
-        private void GenerateRelationship(IForeignKey foreignKey, bool useDataAnnotations, IndentedStringBuilder sb)
+        private void GenerateRelationship(IEntityType entityType, IForeignKey foreignKey, bool useDataAnnotations, IndentedStringBuilder sb)
         {
             var canUseDataAnnotations = true;
             var annotations = AnnotationCodeGenerator
                 .FilterIgnoredAnnotations(foreignKey.GetAnnotations())
                 .ToDictionary(a => a.Name, a => a);
             AnnotationCodeGenerator.RemoveAnnotationsHandledByConventions(foreignKey, annotations);
+            // TODO: Resolve TransformNavPropertyName() method
+            NavEntityPropertyInfo navEntityPropertyInfo = ResolvingNamesService.ResolvingName(entityType, foreignKey);
 
             var lines = new List<string>
             {
-                $".{nameof(EntityTypeBuilder.HasOne)}("
-                + (foreignKey.DependentToPrincipal != null ? $"d => d.{EntityTypeTransformationService.TransformNavPropertyName(foreignKey.DependentToPrincipal?.Name, foreignKey.PrincipalToDependent?.DeclaringType.Name)}" : null)
-                + ")",
+
+            $".{nameof(EntityTypeBuilder.HasOne)}("
+            + (foreignKey.DependentToPrincipal != null ? $"d => d.{EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName,foreignKey.DependentToPrincipal?.Name, foreignKey.PrincipalToDependent?.DeclaringType.Name, navEntityPropertyInfo.PropertyIsNullable)}" : null)
+            + ")",
                 $".{(foreignKey.IsUnique ? nameof(ReferenceNavigationBuilder.WithOne) : nameof(ReferenceNavigationBuilder.WithMany))}"
                 + "("
-                + (foreignKey.PrincipalToDependent != null ? $"p => p.{EntityTypeTransformationService.TransformNavPropertyName(foreignKey.PrincipalToDependent?.Name, foreignKey.DependentToPrincipal?.DeclaringType.Name)}" : null)
+                + (foreignKey.PrincipalToDependent != null ? $"p => p.{EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName, foreignKey.PrincipalToDependent?.Name, foreignKey.DependentToPrincipal?.DeclaringType.Name, navEntityPropertyInfo.PropertyIsNullable)}" : null)
                 + ")"
             };
 
             if (!foreignKey.PrincipalKey.IsPrimaryKey())
             {
+                Func<string, string, string> tmpNameTransformFunction = (tmpName, tmpType) =>
+                {
+                    return EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName, tmpName, tmpType, navEntityPropertyInfo.PropertyIsNullable);
+                };
                 canUseDataAnnotations = false;
                 lines.Add(
                     $".{nameof(ReferenceReferenceBuilder.HasPrincipalKey)}"
                     + (foreignKey.IsUnique ? $"<{EntityTypeTransformationService.TransformPropertyName(((ITypeBase)foreignKey.PrincipalEntityType).DisplayName(), "")}>" : "")
-                    + $"(p => {GenerateLambdaToKey(foreignKey.PrincipalKey.Properties, "p", EntityTypeTransformationService.TransformNavPropertyName)})");
+                    + $"(p => {GenerateLambdaToKey(foreignKey.PrincipalKey.Properties, "p", tmpNameTransformFunction)})");
             }
 
             lines.Add(
-                $".{nameof(ReferenceReferenceBuilder.HasForeignKey)}"
-                + (foreignKey.IsUnique ? $"<{GetEntityTypeName(foreignKey.PrincipalEntityType, EntityTypeTransformationService.TransformTypeEntityName(((ITypeBase)foreignKey.DeclaringEntityType).DisplayName()))}>" : "")
-                + $"(d => {GenerateLambdaToKey(foreignKey.Properties, "d", EntityTypeTransformationService.TransformPropertyName)})");
+                        $".{nameof(ReferenceReferenceBuilder.HasForeignKey)}"
+                        + (foreignKey.IsUnique ? $"<{GetEntityTypeName(foreignKey.PrincipalEntityType, EntityTypeTransformationService.TransformTypeEntityName(((ITypeBase)foreignKey.DeclaringEntityType).DisplayName()))}>" : "")
+                        + $"(d => {GenerateLambdaToKey(foreignKey.Properties, "d", EntityTypeTransformationService.TransformPropertyName)})");
 
             var defaultOnDeleteAction = foreignKey.IsRequired
                 ? DeleteBehavior.Cascade

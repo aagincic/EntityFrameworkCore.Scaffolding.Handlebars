@@ -72,6 +72,12 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
         /// </summary>
         public virtual IEntityTypeTransformationService EntityTypeTransformationService { get; }
 
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public virtual ResolvingNamesService ResolvingNamesService { get; }
+
         /// <summary>
         /// Constructor for the Handlebars entity types generator.
         /// </summary>
@@ -85,6 +91,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             [NotNull] ICSharpHelper cSharpHelper,
             [NotNull] IEntityTypeTemplateService entityTypeTemplateService,
             [NotNull] IEntityTypeTransformationService entityTypeTransformationService,
+            [NotNull] ResolvingNamesService resolvingNamesService,
             [NotNull] IOptions<HandlebarsScaffoldingOptions> options)
             : base(annotationCodeGenerator, cSharpHelper)
         {
@@ -95,6 +102,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             CSharpHelper = cSharpHelper;
             EntityTypeTemplateService = entityTypeTemplateService;
             EntityTypeTransformationService = entityTypeTransformationService;
+            ResolvingNamesService = resolvingNamesService;
             _options = options;
         }
 
@@ -173,7 +181,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             }
 
             var transformedEntityName = EntityTypeTransformationService.TransformTypeEntityName(entityType.Name);
-            
+
             if (_options?.Value?.GenerateComments == true)
                 TemplateData.Add("comment", GenerateComment(entityType.GetComment(), 1));
             TemplateData.Add("class", transformedEntityName);
@@ -207,7 +215,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                     });
                 }
 
-                var transformedLines = EntityTypeTransformationService.TransformConstructor(lines);
+                var transformedLines = EntityTypeTransformationService.TransformConstructor(entityType.Name, lines);
 
                 TemplateData.Add("lines", transformedLines);
             }
@@ -231,12 +239,13 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                 {
                     GeneratePropertyDataAnnotations(property);
                 }
-                
+
                 var propertyType = CSharpHelper.Reference(property.ClrType);
-                if (_options?.Value?.EnableNullableReferenceTypes == true 
+                if (_options?.Value?.EnableNullableReferenceTypes == true
                     && property.IsNullable
-                    && !propertyType.EndsWith("?")) {
-                        propertyType += "?";
+                    && !propertyType.EndsWith("?"))
+                {
+                    propertyType += "?";
                 }
                 properties.Add(new Dictionary<string, object>
                 {
@@ -249,7 +258,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                 });
             }
 
-            var transformedProperties = EntityTypeTransformationService.TransformProperties(properties);
+            var transformedProperties = EntityTypeTransformationService.TransformProperties(entityType.Name, properties);
 
             TemplateData.Add("properties", transformedProperties);
         }
@@ -298,9 +307,14 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             {
                 var navProperties = new List<Dictionary<string, object>>();
 
+
+
                 foreach (var navigation in sortedNavigations)
                 {
                     NavPropertyAnnotations = new List<Dictionary<string, object>>();
+
+                    // TODO: Resolve TransformNavPropertyName() method
+                    NavEntityPropertyInfo navEntityPropertyInfo = ResolvingNamesService.ResolvingName(navigation);
 
                     if (UseDataAnnotations)
                     {
@@ -315,12 +329,15 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                     var navPropertyType = navigation.TargetEntityType.Name;
                     if (_options?.Value?.EnableNullableReferenceTypes == true &&
                         !navPropertyType.EndsWith("?") &&
-                        propertyIsNullable) {
+                        propertyIsNullable)
+                    {
                         navPropertyType += "?";
                     }
 
                     navProperties.Add(new Dictionary<string, object>
                     {
+                        { "foregin-entity-name", navEntityPropertyInfo.ForeginEntityName },
+                        { "field-name", navEntityPropertyInfo.FieldName },
                         { "nav-property-collection", navigation.IsCollection },
                         { "nav-property-type", navPropertyType },
                         { "nav-property-name", navigation.Name },
@@ -330,7 +347,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                     });
                 }
 
-                var transformedNavProperties = EntityTypeTransformationService.TransformNavigationProperties(navProperties);
+                var transformedNavProperties = EntityTypeTransformationService.TransformNavigationProperties(entityType.Name, navProperties);
 
                 TemplateData.Add("nav-properties", transformedNavProperties);
             }
@@ -534,17 +551,20 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             {
                 if (navigation.ForeignKey.PrincipalKey.IsPrimaryKey())
                 {
+                    // TODO: Resolve TransformNavPropertyName() method
+                    NavEntityPropertyInfo navEntityPropertyInfo = ResolvingNamesService.ResolvingName(navigation);
+
                     var foreignKeyAttribute = new AttributeWriter(nameof(ForeignKeyAttribute));
 
                     if (navigation.ForeignKey.Properties.Count > 1)
                     {
                         foreignKeyAttribute.AddParameter(
                                 CSharpHelper.Literal(
-                                    string.Join(",", navigation.ForeignKey.Properties.Select(p => EntityTypeTransformationService.TransformNavPropertyName(p.Name, p.ClrType.Name)))));
+                                    string.Join(",", navigation.ForeignKey.Properties.Select(p => EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName, p.Name, p.ClrType.Name, navEntityPropertyInfo.PropertyIsNullable)))));
                     }
                     else
                     {
-                        foreignKeyAttribute.AddParameter($"nameof({EntityTypeTransformationService.TransformNavPropertyName(navigation.ForeignKey.Properties.First().Name, navigation.ForeignKey.Properties.First().ClrType.Name)})");
+                        foreignKeyAttribute.AddParameter($"nameof({EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName, navigation.ForeignKey.Properties.First().Name, navigation.ForeignKey.Properties.First().ClrType.Name, navEntityPropertyInfo.PropertyIsNullable)})");
                     }
 
                     NavPropertyAnnotations.Add(new Dictionary<string, object>
@@ -563,14 +583,19 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
 
                 if (inverseNavigation != null)
                 {
+                    // TODO: Resolve TransformNavPropertyName() method
+                    NavEntityPropertyInfo navEntityPropertyInfo = ResolvingNamesService.ResolvingName(navigation);
+
+                    var foreignKeyAttribute = new AttributeWriter(nameof(ForeignKeyAttribute));
+
                     var inversePropertyAttribute = new AttributeWriter(nameof(InversePropertyAttribute));
 
-                    var propertyName = EntityTypeTransformationService.TransformNavPropertyName(inverseNavigation.Name, navigation.DeclaringType.Name);
+                    var propertyName = EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName, inverseNavigation.Name, navigation.DeclaringType.Name, navEntityPropertyInfo.PropertyIsNullable);
                     inversePropertyAttribute.AddParameter(
                         !navigation.DeclaringEntityType.GetPropertiesAndNavigations().Any(
                                 m => m.Name == inverseNavigation.DeclaringEntityType.Name ||
-                                    EntityTypeTransformationService.TransformNavPropertyName(m.Name, navigation.TargetEntityType.Name) 
-                                        == EntityTypeTransformationService.TransformNavPropertyName(inverseNavigation.DeclaringEntityType.Name, navigation.TargetEntityType.Name))
+                                    EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName, m.Name, navigation.TargetEntityType.Name, navEntityPropertyInfo.PropertyIsNullable)
+                                        == EntityTypeTransformationService.TransformNavPropertyName(navEntityPropertyInfo.FieldName, navEntityPropertyInfo.ForeginEntityName, navEntityPropertyInfo.EntityName, inverseNavigation.DeclaringEntityType.Name, navigation.TargetEntityType.Name, navEntityPropertyInfo.PropertyIsNullable))
                             ? $"nameof({EntityTypeTransformationService.TransformTypeEntityName(inverseNavigation.DeclaringType.Name)}.{propertyName})"
                             : CSharpHelper.Literal(propertyName));
 

@@ -94,6 +94,7 @@ namespace Microsoft.EntityFrameworkCore.Design
 
             services.AddSingleton(entityGeneratorType, entityGeneratorImpl);
             services.AddSingleton<IContextTransformationService, HbsContextTransformationService>();
+            services.AddSingleton<ResolvingNamesService, ResolvingNamesService>();
 
             if (scaffoldingOptions.LanguageOptions == LanguageOptions.TypeScript)
             {
@@ -200,7 +201,7 @@ namespace Microsoft.EntityFrameworkCore.Design
             Func<string, string> entityFileNameTransformer = null,
             Func<EntityPropertyInfo, EntityPropertyInfo> constructorTransformer = null,
             Func<EntityPropertyInfo, EntityPropertyInfo> propertyTransformer = null,
-            Func<EntityPropertyInfo, EntityPropertyInfo> navPropertyTransformer = null,
+            Func<NavEntityPropertyInfo, NavEntityPropertyInfo> navPropertyTransformer = null,
             Func<string, string> contextFileNameTransformer = null)
         {
             services.AddSingleton<IEntityTypeTransformationService>(provider =>

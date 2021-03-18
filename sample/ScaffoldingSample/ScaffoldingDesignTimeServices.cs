@@ -60,11 +60,11 @@ namespace ScaffoldingSample
             services.AddHandlebarsBlockHelpers(ifCondHelper);
 
             // Add Handlebars transformer for Country property
-            services.AddHandlebarsTransformers(
-                propertyTransformer: e =>
-                    e.PropertyName == "Country"
-                        ? new EntityPropertyInfo("Country", e.PropertyName, false)
-                        : new EntityPropertyInfo(e.PropertyType, e.PropertyName, e.PropertyIsNullable));
+            //services.AddHandlebarsTransformers(
+            //    propertyTransformer: e =>
+            //        e.PropertyName == "Country"
+            //            ? new EntityPropertyInfo("Country", e.PropertyName, false)
+            //            : new EntityPropertyInfo(e.PropertyType, e.PropertyName, e.PropertyIsNullable));
 
             // Add optional Handlebars transformers
             //services.AddHandlebarsTransformers(

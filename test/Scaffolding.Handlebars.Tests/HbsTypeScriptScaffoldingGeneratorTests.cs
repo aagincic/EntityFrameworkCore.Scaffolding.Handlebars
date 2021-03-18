@@ -381,6 +381,7 @@ namespace Scaffolding.Handlebars.Tests
                         provider.GetRequiredService<IDbContextTemplateService>(),
                         provider.GetRequiredService<IEntityTypeTransformationService>(),
                         provider.GetRequiredService<ICSharpHelper>(),
+                        provider.GetRequiredService<ResolvingNamesService>(),
                         provider.GetRequiredService<IOptions<HandlebarsScaffoldingOptions>>());
                     return options == ReverseEngineerOptions.DbContextOnly ||
                            options == ReverseEngineerOptions.DbContextAndEntities
@@ -395,6 +396,7 @@ namespace Scaffolding.Handlebars.Tests
                         provider.GetRequiredService<IEntityTypeTransformationService>(),
                         provider.GetRequiredService<ICSharpHelper>(),
                         provider.GetRequiredService<ITypeScriptHelper>(),
+                        provider.GetRequiredService<ResolvingNamesService>(),
                         provider.GetRequiredService<IOptions<HandlebarsScaffoldingOptions>>());
                     return options == ReverseEngineerOptions.EntitiesOnly ||
                            options == ReverseEngineerOptions.DbContextAndEntities

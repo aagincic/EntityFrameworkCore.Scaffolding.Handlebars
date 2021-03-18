@@ -16,12 +16,18 @@
         /// <param name="propertyType">Property type.</param>
         /// <param name="propertyName">Property name.</param>
         /// <param name="propertyIsNullable">Property is nullable.</param>
-        public EntityPropertyInfo(string propertyType, string propertyName, bool propertyIsNullable = false)
+        public EntityPropertyInfo(string entityName, string propertyType, string propertyName, bool propertyIsNullable = false)
         {
+            EntityName = entityName;
             PropertyType = propertyType;
             PropertyName = propertyName;
             PropertyIsNullable = propertyIsNullable;
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public string EntityName{get; set;}
 
         /// <summary>
         /// Property type.

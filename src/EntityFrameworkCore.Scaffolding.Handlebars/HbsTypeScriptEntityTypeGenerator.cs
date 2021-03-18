@@ -48,6 +48,8 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
         /// </summary>
         protected virtual IEntityTypeTransformationService EntityTypeTransformationService { get; }
 
+        protected virtual ResolvingNamesService ResolvingNamesService { get; }
+
         /// <summary>
         /// Constructor for the Handlebars entity types generator.
         /// </summary>
@@ -63,6 +65,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             [NotNull] IEntityTypeTransformationService entityTypeTransformationService,
             [NotNull] ICSharpHelper cSharpHelper,
             [NotNull] ITypeScriptHelper typeScriptHelper,
+            [NotNull] ResolvingNamesService resolvingNamesService,
             [NotNull] IOptions<HandlebarsScaffoldingOptions> options)
             : base(annotationCodeGenerator, cSharpHelper)
         {
@@ -70,7 +73,8 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
             EntityTypeTransformationService = entityTypeTransformationService;
             CSharpHelper = cSharpHelper;
             TypeScriptHelper = typeScriptHelper;
-            _options =options;
+            ResolvingNamesService = resolvingNamesService;
+            _options = options;
         }
 
         /// <summary>
@@ -158,7 +162,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                     });
                 }
 
-                var transformedLines = EntityTypeTransformationService.TransformConstructor(lines);
+                var transformedLines = EntityTypeTransformationService.TransformConstructor(entityType.Name, lines);
 
                 TemplateData.Add("lines", transformedLines);
             }
@@ -187,7 +191,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                 });
             }
 
-            var transformedProperties = EntityTypeTransformationService.TransformProperties(properties);
+            var transformedProperties = EntityTypeTransformationService.TransformProperties(entityType.Name, properties);
 
             TemplateData.Add("properties", transformedProperties);
         }
@@ -210,8 +214,12 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
 
                 foreach (var navigation in sortedNavigations)
                 {
+                    // TODO: Resolve TransformNavPropertyName() method
+                    NavEntityPropertyInfo navEntityPropertyInfo = ResolvingNamesService.ResolvingName(navigation);
                     navProperties.Add(new Dictionary<string, object>
                     {
+                        { "foregin-entity-name", navEntityPropertyInfo.ForeginEntityName },
+                        { "field-name", navEntityPropertyInfo.FieldName },
                         { "nav-property-collection", navigation.IsCollection },
                         { "nav-property-type", navigation.TargetEntityType.Name },
                         { "nav-property-name", TypeScriptHelper.ToCamelCase(navigation.Name) },
@@ -220,7 +228,7 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
                     });
                 }
 
-                var transformedNavProperties = EntityTypeTransformationService.TransformNavigationProperties(navProperties);
+                var transformedNavProperties = EntityTypeTransformationService.TransformNavigationProperties(entityType.Name, navProperties);
 
                 TemplateData.Add("nav-properties", transformedNavProperties);
             }

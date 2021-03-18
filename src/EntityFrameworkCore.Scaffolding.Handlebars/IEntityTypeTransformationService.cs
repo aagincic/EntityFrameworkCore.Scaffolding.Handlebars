@@ -32,30 +32,37 @@ namespace EntityFrameworkCore.Scaffolding.Handlebars
         /// <summary>
         /// Transform single navigation property name.
         /// </summary>
+        /// <param name="fieldName">Database field name.</param>
+        /// <param name="foreginEntityName">Foregin entity / or table name.</param>
+        /// <param name="entityName">Current entity / table name.</dparam>
+        /// <param name="propertyType">Property type.</param>
         /// <param name="propertyName">Property name.</param>
-        /// <param name="propertyType">Property type</param>
+        /// <param name="propertyIsNullable">Is property nullable.</param>
         /// <returns>Transformed property name.</returns>
-        string TransformNavPropertyName(string propertyName, string propertyType);
+        string TransformNavPropertyName(string fieldName, string foreginEntityName, string entityName, string propertyType, string propertyName, bool propertyIsNullable = false);
 
         /// <summary>
         /// Transform entity type constructor.
         /// </summary>
+        /// <param name="entityName"></param>
         /// <param name="lines">Constructor lines.</param>
         /// <returns>Transformed constructor lines.</returns>
-        List<Dictionary<string, object>> TransformConstructor(List<Dictionary<string, object>> lines);
+        List<Dictionary<string, object>> TransformConstructor(string entityName, List<Dictionary<string, object>> lines);
 
         /// <summary>
         /// Transform entity type properties.
         /// </summary>
+        /// <param name="entityName"></param>
         /// <param name="properties">Entity type properties.</param>
         /// <returns>Transformed entity type properties.</returns>
-        List<Dictionary<string, object>> TransformProperties(List<Dictionary<string, object>> properties);
+        List<Dictionary<string, object>> TransformProperties(string entityName, List<Dictionary<string, object>> properties);
 
         /// <summary>
         /// Transform entity type navigation properties.
         /// </summary>
+        /// <param name="entityName"></param>
         /// <param name="navProperties">Entity type navigation properties.</param>
         /// <returns>Transformed entity type navigation properties.</returns>
-        List<Dictionary<string, object>> TransformNavigationProperties(List<Dictionary<string, object>> navProperties);
+        List<Dictionary<string, object>> TransformNavigationProperties(string entityName, List<Dictionary<string, object>> navProperties);
     }
 }
